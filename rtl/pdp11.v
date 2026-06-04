@@ -504,7 +504,13 @@ assign      enable_s1 = istate == s1 && ~trap_abort && ~trap_bus;
      istate == s3 ? bus_data_in :
 
      // assert trap vector during t1
-     istate == t0 ? ((odd_pc |
+     // FIX: MMU abort（vector 250）を bus error（vector 4）より優先する。
+     // expand-down スタックのページ長 abort と、同命令のオペランドが I/O ページ物理に
+     // 変換されて起きる spurious bus error が同時にラッチされると、元の優先順では
+     // vector 4 が選ばれ V6 が致命的バスエラー扱いにしてしまう（スタック自動拡張されない）。
+     // PDP-11 仕様では MMU abort が最優先（メモリサイクルを抑止する）。
+     istate == t0 ? (trap_abort ? 16'o250 :
+		     (odd_pc |
 		      trap_odd | trap_oflo | trap_bus | trap_res) ? 16'o4 :
 		     trap_ill ? 16'o10 :
 		     trap_priv ? 16'o10 :
@@ -512,7 +518,6 @@ assign      enable_s1 = istate == s1 && ~trap_abort && ~trap_bus;
 		     trap_iot ? 16'o20 :
 		     trap_emt ? 16'o30 :
 		     trap_trap ? 16'o34 :
-		     trap_abort ? 16'o250 :
  		     interrupt ? { 8'b0, vector } :
 		     16'd0) :
 
@@ -826,7 +831,13 @@ assign      enable_s1 = istate == s1 && ~trap_abort && ~trap_bus;
 `endif
 //----debug----
 
-   assign assert_trap_bus = bus_error;
+   // FIX: MMU abort（ページ長エラー等）はバスサイクルを抑止するのが PDP-11 仕様。
+   // この CPU は abort 中のアクセスもバスへ出してしまい、expand-down スタックの
+   // 範囲外ブロックが I/O ページ物理に変換されて spurious な bus_error を起こす。
+   // trap 優先度は trap_bus > trap_abort（下記 16'o4 / 16'o250）なので、
+   // 抑止しないと V6 はスタック自動拡張（abort=vector250）ではなく致命的
+   // バスエラー（vector4）として扱い、cc が "Bus error" で落ちる。
+   assign assert_trap_bus = bus_error && ~mmu_abort;
 
    // we should generalize external aborts w/external vector
    assign assert_trap_abort = mmu_abort || mmu_trap;

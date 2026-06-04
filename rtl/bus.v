@@ -102,16 +102,28 @@ output [4:0] rk_state;
    reg [15:0] 	hold_bus_data_in;
    reg 		hold_bus_rd, hold_bus_wr, hold_bus_byte_op;
 
+   // 実装 RAM 上限（バイト）。これ以上 ～ I/O ページ未満は「存在しないメモリ」とし、
+   // iopage no_decode と全く同じ条件（ram_access=0, iopage_access=0 → data=0xffff,
+   // bus_error=1）で確実に CPU をトラップさせる。これにより V6 main.c のメモリプローブ
+   // (mfpi) が正しい末尾を検出し、maxmem の過大検出（→ ユーザスタックが I/O ページに
+   // マップされ cc がバスエラー）を防ぐ。デバイスデコードには当てないので副作用なし。
+   wire   nxm_access;
+
 `ifdef use_18bit_phys
    // 18 bit physical addressing
    assign 	iopage_access = bus_addr[17:13] == 5'o37;
-   
-   assign 	ram_access = ~iopage_access;
+
+   // I/O ページでも実装 RAM 内でもないアドレス = 存在しないメモリ
+   assign 	nxm_access = ~iopage_access && (bus_addr[17:0] >= 18'o600000);
+
+   assign 	ram_access = ~iopage_access && ~nxm_access;
 `else
    // 22 bit physical addressing
    assign 	iopage_access = (bus_addr[21:13] == 9'o777);
-  
-   assign 	ram_access = ~iopage_access;
+
+   assign 	nxm_access = ~iopage_access && (bus_addr >= 22'o600000);
+
+   assign 	ram_access = ~iopage_access && ~nxm_access;
 `endif
    
    assign 	iopage_rd = grant_cpu & /*hold_*/bus_rd & iopage_access;
@@ -255,7 +267,10 @@ output [4:0] rk_state;
    wire   ram_bus_error;
    wire   ram_present;
 
-   assign bus_error = iopage_bus_error || ram_bus_error;
+   // 存在しないメモリ（nxm_access）へのアクセスもバスエラーにする。
+   wire   nxm_bus_error = nxm_access && (bus_rd || bus_wr);
+
+   assign bus_error = iopage_bus_error || ram_bus_error || nxm_bus_error;
 
    // register request from cpu
    always @(posedge clk)
@@ -278,17 +293,9 @@ output [4:0] rk_state;
 	 end
 
    
-`ifdef sim_56k
-   //
-   // for diagnostics, pretend we have 56k of ram
-   //
-   assign ram_present = bus_addr < 22'o160000;
-`else
-   // 256k
-   assign ram_present = bus_addr < 22'o760000;
-//   // 128k
-//   assign ram_present = bus_addr < 22'o400000;
-`endif
+   // 実装 RAM = 192KB（0o600000）。これ以上は nxm_access が処理する。
+   // ram_access はこの範囲内に限定済みなので ram_bus_error は通常発火しない。
+   assign ram_present = bus_addr < 22'o600000;
    
    assign ram_bus_error = ram_access && (bus_rd || bus_wr) && ~ram_present;
 

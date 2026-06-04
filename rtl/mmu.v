@@ -383,7 +383,10 @@ module mmu(clk, reset, soft_reset,
 		 if (pg_len_err)
 		   begin
 		      update_mmr0_ple = 1;
-		      signal_trap = 1;
+		      // FIX: page-length error must ABORT (vector 0o250), not deferred-trap.
+		      // read 経路(acf 2/5/6)は abort 済み。write も abort にして
+		      // expand-down スタックの自動拡張を機能させる。
+		      signal_abort = 1;
  `ifdef debug/*_mmu*/
 		      $display("zzz: signal trap, wr len; pdr_ed=%b, cpu_bn=%o, pdr_plf=%o",
 			       pdr_ed, cpu_bn, pdr_plf);
@@ -586,10 +589,7 @@ module mmu(clk, reset, soft_reset,
 		2'b01: mmr0 <= {mmr0[15:8], pxr_data_in[7:0]};
 		default: mmr0 <= pxr_data_in;
 	      endcase
-
-`ifdef debug/*_mmu*/
-	      $display("mmu: write mmr0 <- %o", pxr_data_in);
-`endif
+	      /* $display("mmu: write mmr0 <- %o", pxr_data_in); */
 	   end
 
 	   8'b10xxxx11: begin
