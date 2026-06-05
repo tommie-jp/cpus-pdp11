@@ -3,7 +3,7 @@
 // copyright Brad Parker <brad@heeltoe.com> 2009-2010
 //
 
-`define no_mmu
+// `define no_mmu  // disabled: simulation uses real mmu for Unix V6
 
 module top(rs232_txd, rs232_rxd,
 	   button, led, sysclk,
@@ -48,7 +48,7 @@ module top(rs232_txd, rs232_rxd,
 
    //
    wire         reset;
-   wire [31:0] 	initial_pc/*verilator public_flat*/;
+   reg [31:0] 	initial_pc /* verilator public_flat_rw */;
    wire [15:0] 	pc;
    wire 	halted;
    wire 	waited;
@@ -62,8 +62,8 @@ module top(rs232_txd, rs232_rxd,
    wire 	mmu_trap;
    wire 	mmu_wr_inhibit;
    wire [15:0] 	mmu_incdec;
-   
-   assign initial_pc = 32'o173000;
+
+   initial initial_pc = 32'o173000;
 
 `ifndef sim_time
  `define slower

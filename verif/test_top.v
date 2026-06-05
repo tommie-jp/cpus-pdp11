@@ -3,8 +3,8 @@
 // copyright Brad Parker <brad@heeltoe.com> 2009-2010
 //
 
-`define minimal_debug	1
-`define debug		1
+//`define minimal_debug	1
+//`define debug		1
 `define sim_time	1
 
 `define fake_uart
@@ -12,14 +12,14 @@
 
 `define debug_tt_out	1
 `define debug_tt_int	1
-`define debug_io 	1
+//`define debug_io 	1
 //`define debug_bus_io 	1
 //`define debug_bus_all 	1
-`define debug_bus_ram 	1
+//`define debug_bus_ram 	1
 
-`define debug_cpu_int	1
+//`define debug_cpu_int	1
 
-// for RT-11
+// Unix V6 test: disable MMU to isolate boot issue
 //`define no_mmu
 //`define use_18bit_phys
 //`define sim_56k
@@ -119,7 +119,8 @@ module wrap_s3board_ram(clk,
    output [15:0] ram2_out;
    input 	 ram2_ce_n, ram2_ub_n, ram2_lb_n;
 
-   wire [31:0] din, dout;
+   wire [31:0] din;
+   reg  [31:0] dout;
 	   
    wire [31:0] addr;
    wire   rd, wr, ub, lb;
@@ -164,9 +165,9 @@ module test_top;
    wire rs232_txd;
    reg 	rs232_rxd;
 
-   reg [3:0] button;
+   reg [3:0] button /* verilator public_flat_rw */;
    wire [7:0] led;
-   reg sysclk;
+   reg sysclk /* verilator public_flat_rw */;
 
    wire [7:0] sevenseg;
    wire [3:0] sevenseg_an;

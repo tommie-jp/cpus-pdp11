@@ -267,11 +267,10 @@ module execute(clk, reset, enable,
 `ifdef debug
 			 $display("e: HALT");
 `endif
-//xxx fix me
-//			 if (current_mode == mode_kernel)
+			 if (current_mode == mode_kernel)
 			   assert_halt = 1;
-//			 else
-//			   assert_trap_priv = 1;
+			 else
+			   assert_trap_priv = 1;
 		      end
 		    
 		    1:					    /* wait */

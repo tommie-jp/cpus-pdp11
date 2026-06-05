@@ -80,14 +80,17 @@ module fake_uart(clk, reset,
 	fake_char_delay = `FAKE_CHAR_DELAY;
 
 	//fake_what = fake_bsd211_unix;
-	fake_what = fake_rt11_dir;
+	//fake_what = fake_rt11_dir;
+	fake_what = fake_v6_unix;
 
 	case (fake_what)
 	  fake_no_input: ;
 
 	  fake_v6_unix: begin
-	     fake_max = 9;
+	     fake_max = 17;       // rkunix\r + ROOT\r + ls /\r = 17 chars
 	     fake_count = 0;
+	     fake_init_delay = 8000000;  // @プロンプトが出るまで待つ
+	     fake_char_delay = 3000;
 	  end
 	  fake_v7_unix: begin
 	     fake_max = 18;
@@ -258,10 +261,27 @@ module fake_uart(clk, reset,
 		 3: hold = 8'h6e; //n
 		 4: hold = 8'h69; //i
 		 5: hold = 8'h78; //x
-		 6: hold = 8'h2e; //.
-		 7: hold = 8'h34; //4
-		 8: hold = 8'h30; //0
-		 9: begin
+		 6: begin
+		    hold = 8'h0d; //<ret>
+		    // login: が出るまで 15M サイクル待つ（login は ~12-14M 頃に出る）
+		    fake_char_delay = 15000000;
+		 end
+		 // "ROOT\r" — LCASE モード: 大文字入力 → カーネルが小文字に変換
+		 7: begin hold = 8'h52; fake_char_delay = 3000; end //R
+		 8: hold = 8'h4f; //O
+		 9: hold = 8'h4f; //O
+		 10: hold = 8'h54; //T
+		 11: begin
+		    hold = 8'h0d; //<ret>
+		    // # シェルプロンプトが出るまで 10M サイクル待つ
+		    fake_char_delay = 10000000;
+		 end
+		 // "ls /\r"
+		 12: begin hold = 8'h6c; fake_char_delay = 3000; end //l
+		 13: hold = 8'h73; //s
+		 14: hold = 8'h20; //space
+		 15: hold = 8'h2f; ///
+		 16: begin
 		    hold = 8'h0d; //<ret>
 		    fake_done = 1;
 		 end
