@@ -71,6 +71,24 @@ module mmu(clk, reset, soft_reset,
    reg [7:0] 	 par_h[63:0];
    reg [7:0] 	 par_l[63:0];
 
+   // User I PAR0〜PAR7 を外部から観測できるよう公開（verilator 最適化回避）
+   wire [11:0] user_i_par0 /* verilator public_flat */;
+   assign user_i_par0 = {par_h[48][3:0], par_l[48]};
+   wire [11:0] user_i_par1 /* verilator public_flat */;
+   assign user_i_par1 = {par_h[49][3:0], par_l[49]};
+   wire [11:0] user_i_par2 /* verilator public_flat */;
+   assign user_i_par2 = {par_h[50][3:0], par_l[50]};
+   wire [11:0] user_i_par3 /* verilator public_flat */;
+   assign user_i_par3 = {par_h[51][3:0], par_l[51]};
+   wire [11:0] user_i_par4 /* verilator public_flat */;
+   assign user_i_par4 = {par_h[52][3:0], par_l[52]};
+   wire [11:0] user_i_par5 /* verilator public_flat */;
+   assign user_i_par5 = {par_h[53][3:0], par_l[53]};
+   wire [11:0] user_i_par6 /* verilator public_flat */;
+   assign user_i_par6 = {par_h[54][3:0], par_l[54]};
+   wire [11:0] user_i_par7 /* verilator public_flat */;
+   assign user_i_par7 = {par_h[55][3:0], par_l[55]};
+
    wire [2:0] 	 cpu_apf;
    wire [12:0] 	 cpu_df;
    wire [15:0] 	 cpu_paf;

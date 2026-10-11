@@ -1486,6 +1486,11 @@ assign      enable_s1 = istate == s1 && ~trap_abort && ~trap_bus;
 	       if (assert_trap_abort)
 		    trap_abort <= 1;
 
+`ifdef trap_trace
+	       if (assert_trap_abort)
+		 $display("[TRAP_ABORT] t=%0t pc=%o addr=%o mode=%o sp=%o r5=%o r4=%o r3=%o r2=%o r1=%o r0=%o isn=%o st=%d", $time, pc, bus_addr, current_mode, sp, r5, r4, r3, r2, r1, r0, isn, istate);
+`endif
+
 `ifdef full_debug
 	       if (trace)
 		 $display("trace pc %o, addr %o", pc, bus_addr);
@@ -1495,11 +1500,24 @@ assign      enable_s1 = istate == s1 && ~trap_abort && ~trap_bus;
 	       
 	       if (istate == c1)
 		 begin
+`ifdef trap_trace_isn
+		    // [mknod調査] ユーザーモード命令を逐次ログ（直前の流れ追跡用）
+		    if (current_mode == 2'b11)
+		      $display("[U] pc=%o isn=%o", pc, isn);
+`endif
 		    if (assert_trap_ill)
 		      trap_ill <= 1;
 
 		    if (assert_trap_res)
 		      trap_res <= 1;
+
+`ifdef trap_trace
+		    // [mknod調査] 予約/不正命令トラップを常時ログ（mode 3 = user）
+		    if (assert_trap_ill)
+		      $display("[TRAP_ILL] t=%0t pc=%o isn=%o mode=%o sp=%o", $time, pc, isn, current_mode, sp);
+		    if (assert_trap_res)
+		      $display("[TRAP_RES] t=%0t pc=%o isn=%o mode=%o", $time, pc, isn, current_mode);
+`endif
 
 `ifdef full_debug
 		    if (assert_trap_ill)
@@ -1517,6 +1535,12 @@ assign      enable_s1 = istate == s1 && ~trap_abort && ~trap_bus;
 		 begin
 		    if (assert_trap_priv)
                       trap_priv <= 1;
+
+`ifdef trap_trace
+		    // [mknod調査] 特権命令トラップ（vector 010 = "Illegal instruction" 扱い）
+		    if (assert_trap_priv)
+		      $display("[TRAP_PRIV] pc=%o isn=%o mode=%o sp=%o", pc, isn, current_mode, sp);
+`endif
 
 		    if (assert_bpt)
                       trap_bpt <= 1;
@@ -1539,6 +1563,15 @@ assign      enable_s1 = istate == s1 && ~trap_abort && ~trap_bus;
 `endif
 		 end
 	    end // if (ok_to_assert_trap)
+
+`ifdef trap_trace
+	// VA 0-10 への書き込みを監視（user VA 0 が 0o170011 になる原因調査）
+	if (bus_wr && bus_ack && bus_addr <= 16'd10)
+	  $display("[WRITE_VA0] pc=%o addr=%o data=%o isn=%o st=%d mode=%o r0=%o r1=%o r2=%o r3=%o r4=%o r5=%o", pc, bus_addr, bus_data_out, isn, istate, current_mode, r0, r1, r2, r3, r4, r5);
+	// VA 490-520 (0o752-0o1010) への書き込みをモード問わず監視
+	if (bus_wr && bus_ack && bus_addr >= 16'd490 && bus_addr <= 16'd520)
+	  $display("[WRITE_WATCH] pc=%o addr=%o data=%o isn=%o st=%d mode=%o r0=%o r1=%o r2=%o r3=%o r4=%o r5=%o", pc, bus_addr, bus_data_out, isn, istate, current_mode, r0, r1, r2, r3, r4, r5);
+`endif
 
 	if (ok_to_reset_trace_inhibit)
 	  trace_inhibit <= 0;
