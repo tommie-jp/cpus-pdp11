@@ -147,6 +147,7 @@ module rk_regs (clk, reset, iopage_addr, data_in, data_out, decode,
 		last3 = 20,
 		wait0 = 21,
 		wait1 = 22,
+		seek0 = 23,
 		done0 = 30,
 		done1 = 31,
 		ide_wr0 = 32,
@@ -371,6 +372,36 @@ module rk_regs (clk, reset, iopage_addr, data_in, data_out, decode,
 
    assign vector = 8'o220;
 
+   // seek delay (simulation aid)
+   //
+   // The IDE-backed model starts the DMA transfer a few clocks after GO.
+   // A real RK05 needs tens of milliseconds to seek and wait for the sector,
+   // so the CPU runs a long way before the first word is transferred.
+   // Code that depends on this order (Unix V6 swtch()/u_ssav) behaves
+   // differently without the wait.
+   //
+   // rk_seek_delay = number of clocks to hold a READ/WRITE/WCHK/RCHK command
+   // in seek0 before the IDE sequence starts.  0 (default) = no delay, the
+   // original behaviour.  The simulation harness writes this register.
+   reg [23:0] rk_seek_delay /* verilator public_flat_rw */;
+   reg [23:0] seek_cnt;
+   wire [5:0] seek_dest;
+
+   assign seek_dest = (rkcs_cmd[3:1] == RKCS_CMD_WCHK) ? ide_wr0 :
+		      (rkcs_cmd[3:1] == RKCS_CMD_RCHK) ? ide_rd0 : init0;
+
+   initial rk_seek_delay = 24'd0;
+
+   always @(posedge clk)
+     if (reset)
+       seek_cnt <= 0;
+     else
+       if (rk_state == ready)
+	 seek_cnt <= rk_seek_delay;
+       else
+	 if (rk_state == seek0 && seek_cnt != 0)
+	   seek_cnt <= seek_cnt - 24'd1;
+
    // rk state machine
    always @(posedge clk)
      if (reset)
@@ -417,7 +448,8 @@ module rk_regs (clk, reset, iopage_addr, data_in, data_out, decode,
    always @(rk_state or rkcs_cmd or rkcs_ie or 
 	    rkwc or rkda or rkba or lba or
             ata_done or ata_out or
-	    dma_data_in or dma_ack or dma_data_hold)
+	    dma_data_in or dma_ack or dma_data_hold or
+	    rk_seek_delay or seek_cnt or seek_dest)
      begin
 	rk_state_next = rk_state;
 
@@ -470,11 +502,11 @@ module rk_regs (clk, reset, iopage_addr, data_in, data_out, decode,
 `endif
 			end
 		      RKCS_CMD_WCHK:
-			rk_state_next = ide_wr0;
+			rk_state_next = (rk_seek_delay != 0) ? seek0 : ide_wr0;
 		      RKCS_CMD_RCHK:
-			rk_state_next = ide_rd0;
+			rk_state_next = (rk_seek_delay != 0) ? seek0 : ide_rd0;
 		      default:
-			rk_state_next = init0;
+			rk_state_next = (rk_seek_delay != 0) ? seek0 : init0;
 		      endcase
 `ifdef debug
 		    if (rkcs_done == 0)
@@ -486,6 +518,13 @@ module rk_regs (clk, reset, iopage_addr, data_in, data_out, decode,
 		 end
 	    end
 	  
+	  seek0:
+	    begin
+	       // wait out the simulated seek, then start the command
+	       if (seek_cnt == 0)
+		 rk_state_next = seek_dest;
+	    end
+
 	  init0:
 	    begin
 	       ata_addr = ATA_STATUS;
